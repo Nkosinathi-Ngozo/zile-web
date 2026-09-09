@@ -6,6 +6,7 @@ import {
   defaultContent,
   type SiteContent,
 } from "@/lib/site-content";
+import { fileToCompressedDataUrl } from "@/lib/image-file";
 import { toast } from "sonner";
 
 const FONT_OPTIONS = [
@@ -199,7 +200,7 @@ export default function AdminPage() {
               blank={{ image: "", caption: "", featured: false }}
               render={(item, set) => (
                 <>
-                  <Field label="Image URL" v={item.image} on={(v) => set({ ...item, image: v })} />
+                  <ImageField label="Image" v={item.image} on={(v) => set({ ...item, image: v })} />
                   <Field
                     label="Caption (optional)"
                     v={item.caption ?? ""}
@@ -230,7 +231,7 @@ export default function AdminPage() {
               blank={{ image: "", title: "", date: "", caption: "" }}
               render={(item, set) => (
                 <>
-                  <Field label="Image URL" v={item.image} on={(v) => set({ ...item, image: v })} />
+                  <ImageField label="Image" v={item.image} on={(v) => set({ ...item, image: v })} />
                   <Row>
                     <Field
                       label="Title"
@@ -482,6 +483,75 @@ function Field({ label, v, on }: { label: string; v: string; on: (v: string) => 
         className="w-full border-b border-foreground bg-transparent py-2 focus:outline-none focus:border-accent"
       />
     </label>
+  );
+}
+
+function ImageField({ label, v, on }: { label: string; v: string; on: (v: string) => void }) {
+  const [busy, setBusy] = useState(false);
+
+  async function handleFile(file: File | undefined) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const dataUrl = await fileToCompressedDataUrl(file);
+      on(dataUrl);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not read image");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="block space-y-2">
+      <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+        {label}
+      </span>
+      <div className="flex items-center gap-4">
+        <div
+          className="size-20 shrink-0 bg-neutral-200 border border-border overflow-hidden flex items-center justify-center"
+          style={
+            v
+              ? {
+                  backgroundImage: `url(${v})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                }
+              : undefined
+          }
+        >
+          {!v && <span className="text-[9px] text-muted-foreground uppercase">No image</span>}
+        </div>
+        <div className="flex flex-col gap-2">
+          <label className="border border-foreground px-4 py-2 font-mono text-[10px] uppercase tracking-widest hover:bg-foreground hover:text-background transition-colors cursor-pointer w-fit">
+            {busy ? "Uploading..." : v ? "Replace image" : "Upload image"}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              disabled={busy}
+              onChange={(e) => {
+                handleFile(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+          </label>
+          {v && (
+            <button
+              type="button"
+              onClick={() => on("")}
+              className="text-destructive text-[10px] font-mono uppercase tracking-widest text-left"
+            >
+              Remove image
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
